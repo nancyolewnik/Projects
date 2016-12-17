@@ -1,0 +1,188 @@
+---
+title: "R Notebook for Prosper Loan Data"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+Installing the packages as instructed in the rubric. 
+
+```{r}
+library("ggplot2")
+library("knitr")
+library("dplyr")
+```
+
+Opening the documents 
+```{r}
+getwd()
+pf <- read.csv('prosperLoanData.csv')
+names(pf)
+```
+
+Running the data & summary files 
+```{r}
+data(pf)
+summary(pf)
+```
+
+DOES MY DATASET MEET THE REQUIREMENTS? 
+1. How many observations and variables are there?
+```{r}
+dim(pf)
+```
+## 113,937 observations with 81 variables
+
+INITIAL STRUCTURE OF DATA 
+
+```{r}
+str(pf)
+```
+
+#factorizing rating as these are the key variable we'd investigate throughout the dataset
+```{r}
+pf$ProsperRating.alpha = factor(pf$ProsperRating..Alpha.,
+                                 levels = c("AA","A","B","C","D","E","HR","NA"))
+pf$ProsperRating <-factor(pf$ProsperRating..Alpha,
+                        levels = c('AA', 'A', 'B', 'C', 'D', 'E', 'HR', 'NA'))
+pf$ProsperScore = factor(pf$ProsperScore)
+```
+
+UNIVARIATE PLOT SECTIION
+
+#Histogram of Prosper Rating by numbers of loans
+
+```{r}
+ggplot(data = na.omit(pf), aes(ProsperRating.alpha)) +
+  geom_histogram(aes(fill = ProsperRating.alpha),stat="count") +  
+  ggtitle('Numbers of Loans by Prosper Rating') +
+  xlab('Rating') +
+  ylab('Number of Loans')
+summary(pf$ProsperRating.alpha)
+```
+
+Looks like "NA" and "C" rating loans account for the majority of the loans. 
+
+Prosper Score Distribution
+```{r}
+ggplot(data = pf, aes(x = ProsperScore)) + 
+        geom_bar(color = "black", fill = '#007EE5') +
+        theme(axis.text.x = element_text(angle = 60, vjust = 0.6)) +
+        xlab("Score") + ggtitle("Prosper Score Distribution")
+```
+
+```{r}
+ggplot(data = pf, aes(x = ProsperScore)) + 
+        geom_bar(color = "black", fill = '#007EE5') +
+        theme(axis.text.x = element_text(angle = 60, vjust = 0.6)) +
+        xlab("Score") + ggtitle("Prosper Score Distribution")
+summary(pf$ProsperScore)
+```
+Again, the majority of the scores are "NA" and in the 4-7 category range.
+
+Factor Income Range
+```{r}
+pf$IncomeRange = factor(pf$IncomeRange, levels=c("Not employed", "$0", "$1-24,999", "$25,000-49,999", "$50,000-74,999", "$75,000-99,999", "$100,000+", "Not displayed"))
+
+##3. Income Range
+ggplot(data = pf, aes(IncomeRange)) +
+  geom_bar(color="black", fill = '#007EE5') +
+  ggtitle('Borrower Income Range') +
+  xlab('Income') +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.6)) +
+  ylab('Count')
+```
+
+???? Surprisigly, people with less than 25,000 USD annual income were not the majority of borrowers. I suspect this trend indicate the customer segment Prosper Loan's going after. It's possible the main target are future home-owner, car-owner, studebt-debt payment.
+```{r}
+summary(pf$IncomeRange)
+```
+
+DEBT TO INCOME RATIO
+```{r}
+ggplot(data = pf, aes(x = DebtToIncomeRatio)) +                
+        geom_histogram(color = "black", fill = '#007EE5', binwidth = 0.02) +
+        xlim(0, quantile(pf$DebtToIncomeRatio, prob = 0.99, na.rm=TRUE)) +
+        ggtitle("Debt To Income Ratio") +
+        xlab("Debt to Income Ratio") +
+        ylab("Count")
+```
+
+?????? The data has a long-tailed right-skewed but as expected. It's expected the majority of people in U.S have a credit history, and the ratio should be low enough for a secured repayment. Seems like 25% is the threshold for most borrower.
+```{r}
+summary(pf$DebtToIncomeRatio)
+```
+
+BORROWER'S PURPOSE OF LOAN
+```{r}
+x <- c('Debt Consolidation', 
+                                'Home Improvement','Business', 
+                                 'Personal Loan', 
+                                 'Student Use', 
+                                 'Auto', 
+                                 'Baby & Adoption',
+                                 'Boat', 
+                                 'Cosmetic Procedure', 
+                                 'Engagement Ring', 
+                                 'Green Loans', 
+                                 'Household Expenses', 
+                                 'Large Purchases', 
+                                 'Medical/Dental', 
+                                 'Motorcycle', 'RV',
+                                 'Taxes', 'Vacation',
+                                 'Wedding Loans', 
+                                 'Other', 
+                                 'Not Available')
+pf$ListingCategory <- factor(pf$ListingCategory..numeric., levels = c(1:6,8:20,7,0), labels = x)
+
+ggplot(pf, aes(ListingCategory, ymax = max(..count..))) +
+                geom_histogram( stat = "count") 
+ggplot(pf, aes(x=ListingCategory)) +
+                geom_histogram(aes(y=..count..), binwidth=1, fill="blue",stat="count" )
+#                theme(axis.text.x = element_text(angle = 90, vjust = 0.6))+ 
+#                stat_bin(geom="text", binwidth = 500, size = 3, 
+#                aes(label=..count.., vjust=-0.9, hjust=0.5)) +
+#                ggtitle("The Purpose of the Loan Listing") +
+#                xlab("Listing Category") +
+                #ylab("Number of loans")
+summary(pf$ListingCategory)
+```
+????????????? Again, we see not many people're willing to explain the purpose of loan listing. There's a surprisingly amount of needs for debt consolidation, more than 50%. Now the data for income range makes perfect sense, as young people are going out to the real world and start to repay their student debt, purchase cars, mortgage their apartment, etc. Therefore, people already been in the workforce for many decades wouldn't need much Prosper service.
+
+
+SET LOAN ORIGINAL DATE IN YEAR-MONTH-DATE FORMAT
+```{r}
+pf$LoanOriginationDate <- as.POSIXct(f$LoanOriginationDate, format="%Y-%m-%d")
+pf$LoanOriginationDate.year <-pf$LoanOriginationDate %>% 
+                                          format('%Y') %>% strtoi()
+
+## 6. Number of Loans split by Year
+ggplot(prosper, aes(as.factor(LoanOriginationDate.year))) +
+                geom_histogram(color = 'black', fill = '#007EE5') +
+                ggtitle('Number of Loans by Year') +
+                stat_bin(geom="text", 
+                       aes(label=..count.., vjust=-0.9, hjust=0.5)) +
+                xlab('Year') +
+                ylab('Number of Loans')
+
+summary(pf$LoanOriginationDate.year)
+```
+????????????? The chart took a plunge in 2009 and exploded the year after and peaked in 2013. Now, this period is coincide with the 2008 Global Financial Crisis and government must have conducted certain action toward credit-typed business. Doing a quick Google search, we now understand the period of October 15, 2008 to July 13, 2009 is Prosper's QuietSEC Period, from which they are suspended for lending activities upon SEC approval. Prosper relaunched in July 2009, most notable hypothesis is Prosper needed to adjust their scoring algorigthm to ensure tighter interest rate & stricter rating criteria.
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
