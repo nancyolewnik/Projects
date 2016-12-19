@@ -1,0 +1,287 @@
+---
+title: "R Notebook for Prosper Loan Data"
+output:
+  html_notebook: default
+  html_document: default
+  pdf_document: default
+---
+#A. PREPARING RSTUDIO AND THE DATA SET
+###A1. Installing the packages as instructed in the rubric. 
+
+```{r}
+library("ggplot2")
+library("knitr")
+library("dplyr")
+library(gridExtra)
+```
+
+###A2. Opening the Data Set 
+```{r}
+getwd()
+pf <- read.csv('prosperLoanData.csv')
+names(pf)
+```
+
+###A3. Running the data & summary files 
+```{r}
+data(pf)
+summary(pf)
+```
+
+###A4. Does my data set over 1,000 observations? Are there at least 8 different variables? 
+```{r}
+dim(pf)
+```
+113,937 observations with 81 variables
+
+###A5. Does my data set contain at leasT one categorical variable? 
+```{r}
+lapply(pf,class)
+```
+
+###A6. List out the description of variables and types
+```{r}
+str(pf)
+```
+
+
+#B. UNIVARIATE PLOT SECTIION
+
+###B0. Factorizing rating for the key variable we'd investigate throughout the dataset
+```{r}
+pf$ProsperRating.alpha = factor(pf$ProsperRating..Alpha.,
+                                 levels = c("AA","A","B","C","D","E","HR","NA"))
+pf$ProsperRating <-factor(pf$ProsperRating..Alpha,
+                        levels = c('AA', 'A', 'B', 'C', 'D', 'E', 'HR', 'NA'))
+pf$ProsperScore = factor(pf$ProsperScore)
+```
+
+###B1. HISTOGRAM OF PROSPER RATING BY NUMBERS OF LOANS
+```{r}
+ggplot(data = na.omit(pf), aes(ProsperRating.alpha)) +
+  geom_histogram(aes(fill = ProsperRating.alpha),stat="count") +  
+  ggtitle('Numbers of Loans by Prosper Rating') +
+  xlab('Rating') +
+  ylab('Number of Loans')
+summary(pf$ProsperRating.alpha)
+```
+Looks like "NA" and "C" rating loans account for the majority of the loans. 
+
+###B1 - Part 2. PROSPER RATING DISTRIBUTION
+```{r}
+table(pf$ProsperRating..numeric., useNA = 'ifany')
+summary(pf$ProsperRating..numeric., useNA = 'ifany')
+```
+The NA count of Prosper Rating and Prosper Score is similar (29,084). I'm curious how the Prosper Rating and Prosper Score varies. 
+
+###B2. PROSPER SCORE DISTRIBUTION
+```{r}
+ggplot(pf, aes(x=ProsperScore)) +
+                geom_histogram(aes(y=..count.., vjust=-0.9,   hjust=0.5), binwidth=500, size = 3, fill="blue", stat="count") +
+  ggtitle('Prosper Score of the Borrowers') +
+  xlab('Prosper Score') +
+  ylab('Number of Loans') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+summary(pf$ListingCategory)
+```
+Again, the majority of the scores are "NA" and in the 4-8. category range. Why are there so many ProsperScores that are NA?
+
+###B3. BORROWER INCOME RANGE
+```{r}
+pf$IncomeRange = factor(pf$IncomeRange, levels=c("Not employed", "$0", "$1-24,999", "$25,000-49,999", "$50,000-74,999", "$75,000-99,999", "$100,000+", "Not displayed"))
+
+ggplot(data = pf, aes(IncomeRange)) +
+  geom_bar(color="black", fill = '#007EE5') +
+  ggtitle('Borrower Income Range') +
+  xlab('Income') +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.6)) +
+  ylab('Count')
+```
+The majority of borrowers are in the $25,000 - $75,000 range. I suspect this lower-middle class range needs loans for debt consolidations. 
+
+###B4. DEBT TO INCOME RATIO
+```{r}
+ggplot(data = pf, aes(x = DebtToIncomeRatio)) +                
+        geom_histogram(color = "black", fill = '#007EE5', binwidth = 0.02) +
+        xlim(0, quantile(pf$DebtToIncomeRatio, prob = 0.99, na.rm=TRUE)) +
+        ggtitle("Debt To Income Ratio") +
+        xlab("Debt to Income Ratio") +
+        ylab("Count")
+```
+The data is long-tailed right-skewed. It's expected the majority of people in U.S have a credit history and the ratio should be low enough for a secured repayment. 
+
+###B5. BORROWER'S PURPOSE OF LOAN
+```{r}
+x <- c('Debt Consolidation', 
+                                'Home Improvement','Business', 
+                                 'Personal Loan', 
+                                 'Student Use', 
+                                 'Auto', 
+                                 'Baby & Adoption',
+                                 'Boat', 
+                                 'Cosmetic Procedure', 
+                                 'Engagement Ring', 
+                                 'Green Loans', 
+                                 'Household Expenses', 
+                                 'Large Purchases', 
+                                 'Medical/Dental', 
+                                 'Motorcycle', 'RV',
+                                 'Taxes', 'Vacation',
+                                 'Wedding Loans', 
+                                 'Other', 
+                                 'Not Available')
+
+pf$ListingCategory <- factor(pf$ListingCategory..numeric., levels = c(1:6,8:20,7,0), labels = x)
+
+ggplot(pf, aes(x=ListingCategory)) +
+                geom_histogram(aes(y=..count.., vjust=-0.9,   hjust=0.5), binwidth=500, size = 3, fill="blue",stat="count") +
+  ggtitle('Purpose of Loan') +
+  xlab('Type') +
+  ylab('Number of Loans') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+summary(pf$ListingCategory)
+```
+This chart tells us that not many people are willing to explain the purpose of the loan. I'm surprised that Prosper doesn't require this field. It also looks like there is a high need, more than 50%, for loans for debt consolidation.
+
+###B7. LOAN SPLIT BY AMOUNT
+```{r}
+ggplot(pf, aes(LoanOriginalAmount)) + 
+                geom_histogram(binwidth = 1000) +
+                scale_x_continuous(
+                limits = c(0,quantile(pf$LoanOriginalAmount, 0.99,
+                                                        na.rm = TRUE)),
+                breaks = seq(0, quantile(pf$LoanOriginalAmount, 0.99, 
+                                                  na.rm = TRUE), 2000)) +
+                theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+summary(pf$LoanOriginalAmount)
+```
+The minimum loan amount is $1,000. There appears to four main ranges wherre people borrow money ($5,000 - $10,000 - $15,000 - $20,000). Although this might be more than enough for them to cover their original need, people tend to check these rounded amount boxes.
+
+###B8. EMPLOYMENT STATUS
+```{r}
+ggplot(aes(x = EmploymentStatus), data = na.omit(pf)) +
+                    geom_bar() +
+                    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+                    ggtitle("Loans by Employment Status")
+summary(pf$EmploymentStatus)
+```
+This chart shows that the majority is employed; however, this data could be skewed. Does the "employed" data include part-time or full-time? 
+
+###B9. STATED MONTHLY INCOME
+```{r}
+ggplot(aes(x = StatedMonthlyIncome), data = pf) +
+                  geom_histogram(binwidth = 1000) +
+                  scale_x_continuous(
+                  limits = c(0, quantile(pf$StatedMonthlyIncome, 0.99,
+                                                              na.rm = TRUE)),
+                  breaks = seq(0, quantile(pf$StatedMonthlyIncome, 0.99, 
+                                                      na.rm = TRUE), 1000)) +
+                  theme(axis.text.x = element_text(angle = 90))
+
+summary(pf$StatedMonthlyIncome)
+```
+This chart tells us the most popular stated monthly income is $4,000 - $5,000. 
+
+###B10. BORROWER'S RATE
+```{r}
+ggplot(data = pf, aes(x = BorrowerRate)) + 
+        geom_histogram(color = "black", fill = '#007EE5', binwidth = 0.01) +
+        xlab("Rate") +
+        ggtitle("Borrower Rate") 
+summary(pf$BorrowerRate)
+```
+The most  frequent rates are approximately 15%, 17% and 32%. This variation could be a factor of the amount or debt-to-income ratio.
+
+
+#C. MULTIVARIATE PLOT & ANAYLSIS SECTION
+
+###C1. DEBT TO INCOME RATIO - PROSPER RATING - LENDER YIELD
+```{r}
+ggplot(aes(x= DebtToIncomeRatio, y=LenderYield, color=ProsperRating.alpha), 
+    data=na.omit(filter(pf, DebtToIncomeRatio < 1))) +
+    geom_point(alpha = 1) +
+    #scale_y_log10() +
+    #facet_grid(.~ ProsperRating.alpha ) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    ggtitle("Lender Yield vs Debt to Income Ratio vs Prosper Rate (for loans with rating") +
+    xlab ("Debt To Income Ratio < 1") +
+    ylab ("Lender Yield") +
+    scale_fill_discrete(name = "Prosper Rating")
+```
+This chart shows the coorelation of the Lender Yield, the Prosper Rating and the Debt-To-Income Ratio.
+
+###C2. LENDER YIELD vs PROSPER RATE vs TERM
+```{r}
+plot1 <- ggplot(aes(x= ProsperRating.alpha, y=LenderYield, 
+                                  color=ProsperRating.alpha), 
+       data=na.omit(filter(pf, DebtToIncomeRatio < 1))) +
+    geom_point(alpha = 0.8, position = "jitter") +
+    facet_grid( .~ Term  ) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    ggtitle("Lender Yield vs Term
+            and Prosper Rating")
+
+plot2 <- ggplot(aes(x= ProsperRating.alpha, y= LenderYield ), 
+       data=na.omit(filter(pf, DebtToIncomeRatio < 1))) +
+    geom_boxplot(aes(fill = ProsperRating.alpha)) +
+    facet_grid( .~ Term   ) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    ggtitle("Boxplot - Lender Yield vs Term and Prosper Rating")
+
+grid.arrange(plot1, plot2, ncol=1, nrow =2)
+```
+The chart looks at the term, lender yield and prosper rating. The majority of loans choose 36-month ter where the yield is higher.
+
+
+#D. FINAL PLOTS & SUMMARY
+
+###PROSPER RATING
+```{r}
+ggplot(data = na.omit(pf), aes(ProsperRating.alpha)) +
+  geom_histogram(aes(fill = ProsperRating.alpha),stat="count") +  
+  ggtitle('Numbers of Loans by Prosper Rating') +
+  xlab('Rating') +
+  ylab('Number of Loans')
+summary(pf$ProsperRating.alpha)
+```
+I chose this graph as a final graph because it's important to see to the breakdown of Prosper Rating amount the loans. The most popular Prosper Ratings are D and E. 
+
+### DEBT TO INCOME RATIO
+```{r}
+ggplot(data = pf, aes(x = DebtToIncomeRatio)) +                
+        geom_histogram(color = "black", fill = '#007EE5', binwidth = 0.02) +
+        xlim(0, quantile(pf$DebtToIncomeRatio, prob = 0.99, na.rm=TRUE)) +
+        ggtitle("Debt To Income Ratio") +
+        xlab("Debt to Income Ratio") +
+        ylab("Count")
+```
+Similar to the graph above, I chose the Debt to Income Ratio graph as a final chart because it is important to see that the debt-to-income ratio for most borrowers is less than 0.25.
+
+###DEBT TO INCOME RATIO, LENDER YIELD AND PROSPER RATING
+```{r}
+ggplot(aes(x= DebtToIncomeRatio, y=LenderYield, color=ProsperRating.alpha), 
+       data=na.omit(filter(pf, DebtToIncomeRatio < 1))) +
+  geom_point(alpha = 1) +
+  #scale_y_log10() +
+  #facet_grid(.~ ProsperRating.alpha ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  ggtitle("Lender Yield  vs Debt to Income Ratio vs Prosper Rate (for loans with rating)") +
+  xlab ("Debt To Income Ratio < 1") +
+  ylab ("Lender Yield [%]") +
+  scale_fill_discrete(name = "Prosper Rating")
+```
+I chose to show this chart as one of the final three plots because I believe this shows the relationships between the Lender Yield and Prosper Rating. This shows that the higher the risk, the lower the rating and the better lender yield. A high Prosper Rating rating woul have a good debt-to-income ratio, which creates the upward triangle shape. 
+
+
+#E. REFLECTION
+
+##1. What is the structure of your dataset?
+###The dataset has 113,937 observations and 81 variables. The dates ranges from 2005 through 2014. The types of variables are interger, numeric, date, and factor. The 88 variables could be  split into two categories related to the borrower and investor. 
+
+##2. What are the main features of interest in the dataset?
+###The dataset variables can be split into two for the borrower and lender. For the borrower, the variables of interest are Prosper Rating (numeric & alphabet) because it is an indicator of the quality of borrowers. Other variables of interest are debt-to-income ratio, verifiable income and credit grade. For the lender perspective, Lender Yield and Estimated Return are variables of interest. 
+
+
+##3. What other features in the dataset do you think will help support your investigation into your features of interest?
+###I'm interested in comparing the ProsperScore to the Estimated Return/Loss. I'm curious to learn if their rating criteria has been modified throughout the years. There were approximately 28,000 loans that had NA for a ProsperScore. It would be helpful to investigate the criteria that makes up the ProsperScore.
